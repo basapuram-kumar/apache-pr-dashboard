@@ -1,0 +1,706 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Apache PR Dashboard</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f0f2f5;
+      color: #1a1a2e;
+      min-height: 100vh;
+    }
+
+    /* ── Header ── */
+    header {
+      background: linear-gradient(135deg, #0d1117 0%, #1a3a5c 100%);
+      color: #fff;
+      padding: 20px 32px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      box-shadow: 0 2px 12px rgba(0,0,0,.35);
+    }
+    header .logo {
+      width: 42px; height: 42px;
+      background: #e25d00;
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 900; font-size: 20px; color: #fff; letter-spacing: -1px;
+    }
+    header h1 { font-size: 1.4rem; font-weight: 700; }
+    header p  { font-size: .82rem; color: #8ba3bf; margin-top: 2px; }
+
+    /* ── Main layout ── */
+    main { max-width: 1300px; margin: 0 auto; padding: 24px 20px; }
+
+    /* ── Config card ── */
+    .card {
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 1px 6px rgba(0,0,0,.08);
+      padding: 22px 24px;
+      margin-bottom: 20px;
+    }
+    .card h2 {
+      font-size: .95rem; font-weight: 700; color: #374151;
+      text-transform: uppercase; letter-spacing: .06em;
+      margin-bottom: 16px; border-bottom: 2px solid #e5e7eb; padding-bottom: 10px;
+    }
+
+    .config-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+    @media(max-width: 700px) { .config-grid { grid-template-columns: 1fr; } }
+
+    label { display: block; font-size: .82rem; font-weight: 600; color: #6b7280; margin-bottom: 5px; }
+    input[type=text], input[type=password], input[type=date], select {
+      width: 100%; padding: 8px 12px;
+      border: 1.5px solid #d1d5db; border-radius: 8px;
+      font-size: .88rem; color: #1f2937;
+      transition: border-color .2s;
+      background: #f9fafb;
+    }
+    input:focus, select:focus {
+      outline: none; border-color: #3b82f6;
+      background: #fff;
+    }
+
+    /* Username tags */
+    .tag-input-wrap {
+      border: 1.5px solid #d1d5db; border-radius: 8px;
+      background: #f9fafb; padding: 6px 8px;
+      display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+      cursor: text; min-height: 42px;
+      transition: border-color .2s;
+    }
+    .tag-input-wrap:focus-within { border-color: #3b82f6; background: #fff; }
+    .tag {
+      background: #dbeafe; color: #1d4ed8;
+      border-radius: 6px; padding: 2px 8px;
+      font-size: .8rem; font-weight: 600;
+      display: flex; align-items: center; gap: 4px;
+    }
+    .tag button {
+      background: none; border: none; cursor: pointer;
+      color: #1d4ed8; font-size: 14px; line-height: 1;
+      padding: 0 1px;
+    }
+    .tag button:hover { color: #991b1b; }
+    #username-input {
+      border: none; background: transparent; outline: none;
+      font-size: .88rem; color: #1f2937; min-width: 140px; flex: 1;
+      padding: 2px 4px;
+    }
+
+    .filter-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr 1fr;
+      gap: 16px; margin-top: 16px;
+    }
+    @media(max-width: 800px) { .filter-row { grid-template-columns: 1fr 1fr; } }
+
+    .btn {
+      padding: 9px 22px; border-radius: 8px; border: none;
+      font-size: .88rem; font-weight: 700; cursor: pointer;
+      transition: background .15s, transform .1s;
+    }
+    .btn:active { transform: scale(.97); }
+    .btn-primary { background: #2563eb; color: #fff; }
+    .btn-primary:hover { background: #1d4ed8; }
+    .btn-primary:disabled { background: #93c5fd; cursor: not-allowed; }
+    .btn-clear { background: #f3f4f6; color: #6b7280; border: 1.5px solid #d1d5db; }
+    .btn-clear:hover { background: #e5e7eb; }
+    .btn-export { background: #059669; color: #fff; }
+    .btn-export:hover { background: #047857; }
+
+    .btn-row { display: flex; gap: 10px; margin-top: 18px; flex-wrap: wrap; }
+
+    /* ── Stats strip ── */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 14px; margin-bottom: 20px;
+    }
+    @media(max-width: 900px) { .stats-grid { grid-template-columns: repeat(3,1fr); } }
+    @media(max-width: 600px) { .stats-grid { grid-template-columns: repeat(2,1fr); } }
+
+    .stat-card {
+      background: #fff; border-radius: 12px;
+      box-shadow: 0 1px 6px rgba(0,0,0,.08);
+      padding: 16px 18px;
+      border-top: 4px solid #e5e7eb;
+    }
+    .stat-card.merged  { border-color: #7c3aed; }
+    .stat-card.open    { border-color: #16a34a; }
+    .stat-card.closed  { border-color: #dc2626; }
+    .stat-card.total   { border-color: #2563eb; }
+    .stat-card.members { border-color: #d97706; }
+
+    .stat-card .stat-label {
+      font-size: .74rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .06em; color: #9ca3af;
+    }
+    .stat-card .stat-value {
+      font-size: 2rem; font-weight: 800; color: #111827;
+      line-height: 1.1; margin-top: 4px;
+    }
+
+    /* ── Table ── */
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: .84rem; }
+    th {
+      text-align: left; padding: 10px 14px;
+      background: #f8fafc; color: #6b7280;
+      font-size: .74rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .05em; border-bottom: 2px solid #e5e7eb;
+      white-space: nowrap; cursor: pointer; user-select: none;
+    }
+    th:hover { background: #f1f5f9; color: #374151; }
+    th .sort-icon { margin-left: 4px; color: #d1d5db; }
+    th.sort-asc  .sort-icon, th.sort-desc .sort-icon { color: #3b82f6; }
+
+    td {
+      padding: 10px 14px; border-bottom: 1px solid #f1f5f9;
+      vertical-align: middle;
+    }
+    tr:hover td { background: #f8fafc; }
+
+    .badge {
+      display: inline-block;
+      padding: 2px 10px; border-radius: 99px;
+      font-size: .74rem; font-weight: 700;
+    }
+    .badge-merged  { background: #ede9fe; color: #5b21b6; }
+    .badge-open    { background: #dcfce7; color: #15803d; }
+    .badge-closed  { background: #fee2e2; color: #b91c1c; }
+
+    .pr-title a { color: #1d4ed8; text-decoration: none; font-weight: 500; }
+    .pr-title a:hover { text-decoration: underline; }
+
+    .avatar {
+      width: 26px; height: 26px; border-radius: 50%;
+      vertical-align: middle; margin-right: 6px;
+      border: 1.5px solid #e5e7eb;
+    }
+    .repo-chip {
+      background: #f3f4f6; color: #374151;
+      border-radius: 6px; padding: 2px 8px;
+      font-size: .75rem; font-family: monospace;
+    }
+
+    /* ── Progress / Loading ── */
+    #progress-bar-wrap {
+      display: none; background: #f0f9ff;
+      border-radius: 8px; padding: 12px 16px;
+      margin-bottom: 16px; border: 1px solid #bae6fd;
+    }
+    #progress-text { font-size: .83rem; color: #0369a1; font-weight: 600; margin-bottom: 6px; }
+    .progress-bar-bg {
+      background: #e0f2fe; border-radius: 99px; height: 8px;
+    }
+    #progress-bar {
+      background: linear-gradient(90deg, #0ea5e9, #6366f1);
+      height: 8px; border-radius: 99px; width: 0%;
+      transition: width .3s;
+    }
+
+    /* ── Error / empty ── */
+    .alert {
+      padding: 12px 16px; border-radius: 8px;
+      font-size: .84rem; margin-bottom: 12px;
+    }
+    .alert-error   { background: #fef2f2; color: #b91c1c; border: 1px solid #fca5a5; }
+    .alert-warning { background: #fffbeb; color: #b45309; border: 1px solid #fcd34d; }
+    .alert-info    { background: #f0f9ff; color: #0369a1; border: 1px solid #7dd3fc; }
+
+    .empty-state {
+      text-align: center; padding: 48px 20px; color: #9ca3af;
+    }
+    .empty-state .icon { font-size: 3rem; margin-bottom: 12px; }
+    .empty-state p { font-size: .9rem; }
+
+    /* ── Search box above table ── */
+    .table-toolbar {
+      display: flex; align-items: center; gap: 12px;
+      margin-bottom: 14px; flex-wrap: wrap;
+    }
+    .table-toolbar input {
+      padding: 7px 12px; border: 1.5px solid #d1d5db;
+      border-radius: 8px; font-size: .84rem; background: #f9fafb;
+      flex: 1; min-width: 180px;
+    }
+    .table-toolbar input:focus { outline: none; border-color: #3b82f6; background: #fff; }
+    #result-count { font-size: .8rem; color: #9ca3af; white-space: nowrap; }
+
+    /* ── Rate limit notice ── */
+    #rate-info {
+      font-size: .75rem; color: #9ca3af; text-align: right; margin-top: 8px;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">A</div>
+  <div>
+    <h1>Apache Community PR Dashboard</h1>
+    <p>Track Pull Requests across all Apache GitHub repositories for your team</p>
+  </div>
+</header>
+
+<main>
+
+  <!-- ── Config ── -->
+  <div class="card">
+    <h2>⚙️ Configuration</h2>
+    <div class="config-grid">
+      <div>
+        <label>GitHub Usernames (press Enter or comma to add)</label>
+        <div class="tag-input-wrap" id="tag-wrap">
+          <input type="text" id="username-input" placeholder="e.g. octocat" autocomplete="off" />
+        </div>
+        <div style="font-size:.74rem;color:#9ca3af;margin-top:4px;">Enter team members' GitHub login IDs</div>
+      </div>
+      <div>
+        <label>GitHub Personal Access Token <span style="font-weight:400;color:#9ca3af">(optional but recommended)</span></label>
+        <input type="password" id="gh-token" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" />
+        <div style="font-size:.74rem;color:#9ca3af;margin-top:4px;">
+          Increases rate limit from 60 → 5000 req/hr.
+          <a href="https://github.com/settings/tokens" target="_blank" style="color:#3b82f6">Create token ↗</a>
+        </div>
+      </div>
+    </div>
+
+    <div class="filter-row">
+      <div>
+        <label>From Date</label>
+        <input type="date" id="date-from" />
+      </div>
+      <div>
+        <label>To Date</label>
+        <input type="date" id="date-to" />
+      </div>
+      <div>
+        <label>PR Status</label>
+        <select id="filter-status">
+          <option value="all">All (Open + Merged + Closed)</option>
+          <option value="merged">Merged only</option>
+          <option value="open">Open only</option>
+          <option value="closed">Closed (not merged)</option>
+        </select>
+      </div>
+      <div>
+        <label>Apache Repo Filter</label>
+        <input type="text" id="filter-repo" placeholder="e.g. kafka, spark (optional)" />
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-primary" id="fetch-btn" onclick="fetchAll()">🔍 Fetch PRs</button>
+      <button class="btn btn-clear" onclick="clearAll()">✕ Clear</button>
+      <button class="btn btn-export" onclick="exportCSV()">⬇ Export CSV</button>
+    </div>
+    <div id="rate-info"></div>
+  </div>
+
+  <!-- ── Progress ── -->
+  <div id="progress-bar-wrap">
+    <div id="progress-text">Fetching PRs…</div>
+    <div class="progress-bar-bg"><div id="progress-bar"></div></div>
+  </div>
+
+  <!-- ── Alerts ── -->
+  <div id="alerts"></div>
+
+  <!-- ── Stats ── -->
+  <div class="stats-grid" id="stats" style="display:none">
+    <div class="stat-card total">
+      <div class="stat-label">Total PRs</div>
+      <div class="stat-value" id="s-total">0</div>
+    </div>
+    <div class="stat-card merged">
+      <div class="stat-label">Merged</div>
+      <div class="stat-value" id="s-merged">0</div>
+    </div>
+    <div class="stat-card open">
+      <div class="stat-label">Open</div>
+      <div class="stat-value" id="s-open">0</div>
+    </div>
+    <div class="stat-card closed">
+      <div class="stat-label">Closed</div>
+      <div class="stat-value" id="s-closed">0</div>
+    </div>
+    <div class="stat-card members">
+      <div class="stat-label">Members</div>
+      <div class="stat-value" id="s-members">0</div>
+    </div>
+  </div>
+
+  <!-- ── Table ── -->
+  <div class="card" id="table-card" style="display:none">
+    <h2>📋 Pull Requests</h2>
+    <div class="table-toolbar">
+      <input type="text" id="search-box" placeholder="🔍  Search by title, repo, or user…" oninput="renderTable()" />
+      <span id="result-count"></span>
+    </div>
+    <div class="table-wrap">
+      <table id="pr-table">
+        <thead>
+          <tr>
+            <th onclick="sortBy('user')" id="th-user">User <span class="sort-icon">⇅</span></th>
+            <th onclick="sortBy('title')" id="th-title">Pull Request <span class="sort-icon">⇅</span></th>
+            <th onclick="sortBy('repo')" id="th-repo">Repository <span class="sort-icon">⇅</span></th>
+            <th onclick="sortBy('status')" id="th-status">Status <span class="sort-icon">⇅</span></th>
+            <th onclick="sortBy('created')" id="th-created">Created <span class="sort-icon">⇅</span></th>
+            <th onclick="sortBy('merged')" id="th-merged">Merged <span class="sort-icon">⇅</span></th>
+          </tr>
+        </thead>
+        <tbody id="pr-tbody"></tbody>
+      </table>
+    </div>
+    <div id="empty-table" class="empty-state" style="display:none">
+      <div class="icon">🔎</div>
+      <p>No PRs match your current filters.</p>
+    </div>
+  </div>
+
+</main>
+
+<script>
+// ─────────────────────────────────────────────
+//  State
+// ─────────────────────────────────────────────
+let allPRs       = [];
+let usernames    = [];
+let sortCol      = 'created';
+let sortDir      = 'desc';
+
+// ─────────────────────────────────────────────
+//  Tag input
+// ─────────────────────────────────────────────
+const tagWrap = document.getElementById('tag-wrap');
+const uInput  = document.getElementById('username-input');
+
+function addTag(val) {
+  val = val.trim().replace(/^@/, '').toLowerCase();
+  if (!val || usernames.includes(val)) return;
+  usernames.push(val);
+  renderTags();
+}
+function removeTag(val) {
+  usernames = usernames.filter(u => u !== val);
+  renderTags();
+}
+function renderTags() {
+  [...tagWrap.querySelectorAll('.tag')].forEach(t => t.remove());
+  usernames.forEach(u => {
+    const tag = document.createElement('span');
+    tag.className = 'tag';
+    tag.innerHTML = `${u} <button onclick="removeTag('${u}')" title="Remove">×</button>`;
+    tagWrap.insertBefore(tag, uInput);
+  });
+}
+uInput.addEventListener('keydown', e => {
+  if (['Enter', ',', ' ', 'Tab'].includes(e.key)) {
+    e.preventDefault();
+    const v = uInput.value.replace(/,/g, '').trim();
+    if (v) { addTag(v); uInput.value = ''; }
+  } else if (e.key === 'Backspace' && uInput.value === '' && usernames.length) {
+    removeTag(usernames[usernames.length - 1]);
+  }
+});
+uInput.addEventListener('blur', () => {
+  const v = uInput.value.replace(/,/g, '').trim();
+  if (v) { addTag(v); uInput.value = ''; }
+});
+tagWrap.addEventListener('click', () => uInput.focus());
+
+// ─────────────────────────────────────────────
+//  Helpers
+// ─────────────────────────────────────────────
+function fmtDate(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  return d.toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' });
+}
+function getRepo(item) {
+  // repository_url = "https://api.github.com/repos/apache/kafka"
+  const parts = (item.repository_url || '').split('/');
+  return parts.slice(-2).join('/');
+}
+function getStatus(item) {
+  if (item.pull_request && item.pull_request.merged_at) return 'merged';
+  if (item.state === 'open') return 'open';
+  return 'closed';
+}
+function setAlert(msg, type = 'info') {
+  const el = document.getElementById('alerts');
+  if (!msg) { el.innerHTML = ''; return; }
+  el.innerHTML = `<div class="alert alert-${type}">${msg}</div>`;
+}
+function setProgress(pct, text) {
+  const wrap = document.getElementById('progress-bar-wrap');
+  const bar  = document.getElementById('progress-bar');
+  const txt  = document.getElementById('progress-text');
+  if (pct === null) { wrap.style.display = 'none'; return; }
+  wrap.style.display = 'block';
+  bar.style.width = pct + '%';
+  txt.textContent = text || 'Fetching…';
+}
+
+// ─────────────────────────────────────────────
+//  Fetch
+// ─────────────────────────────────────────────
+async function fetchAll() {
+  if (!usernames.length) {
+    setAlert('Please add at least one GitHub username.', 'error'); return;
+  }
+  setAlert('');
+  allPRs = [];
+  const btn   = document.getElementById('fetch-btn');
+  const token = document.getElementById('gh-token').value.trim();
+  const from  = document.getElementById('date-from').value;
+  const to    = document.getElementById('date-to').value;
+  const repo  = document.getElementById('filter-repo').value.trim().toLowerCase();
+  btn.disabled = true; btn.textContent = '⏳ Fetching…';
+  setProgress(0, 'Starting fetch…');
+
+  const headers = { 'Accept': 'application/vnd.github+json' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
+  let done = 0;
+  const warnings = [];
+
+  for (const user of usernames) {
+    done++;
+    const pct = Math.round((done / usernames.length) * 100);
+    setProgress(pct, `Fetching PRs for ${user} (${done}/${usernames.length})…`);
+
+    let q = `type:pr+author:${user}+org:apache`;
+    if (from)  q += `+created:>=${from}`;
+    if (to)    q += `+created:<=${to}`;
+    if (repo)  q += `+repo:apache/${repo}`;
+
+    let page = 1;
+    let fetched = 0;
+    while (true) {
+      const url = `https://api.github.com/search/issues?q=${q}&per_page=100&page=${page}&sort=created&order=desc`;
+      try {
+        const res = await fetch(url, { headers });
+        // Update rate limit info
+        const remaining = res.headers.get('X-RateLimit-Remaining');
+        const limit     = res.headers.get('X-RateLimit-Limit');
+        if (remaining !== null) {
+          document.getElementById('rate-info').textContent =
+            `GitHub API rate limit: ${remaining} / ${limit} requests remaining`;
+        }
+        if (res.status === 403) {
+          warnings.push(`Rate limit hit while fetching ${user}. Add a GitHub token to increase limits.`);
+          break;
+        }
+        if (res.status === 422) {
+          warnings.push(`Could not search for user "${user}" — user may not exist or have no Apache PRs.`);
+          break;
+        }
+        if (!res.ok) {
+          warnings.push(`Error ${res.status} fetching PRs for ${user}.`);
+          break;
+        }
+        const data = await res.json();
+        const items = data.items || [];
+        // Attach username
+        items.forEach(it => { it._user = user; });
+        allPRs.push(...items);
+        fetched += items.length;
+
+        // GitHub search API caps at 1000 results; paginate only if needed
+        if (items.length < 100 || fetched >= 1000) break;
+        page++;
+        // Small delay to be polite to the API
+        await new Promise(r => setTimeout(r, 300));
+      } catch (err) {
+        warnings.push(`Network error fetching PRs for ${user}: ${err.message}`);
+        break;
+      }
+    }
+  }
+
+  setProgress(null);
+  btn.disabled = false; btn.textContent = '🔍 Fetch PRs';
+
+  if (warnings.length) {
+    setAlert(warnings.map(w => `⚠️ ${w}`).join('<br>'), 'warning');
+  }
+
+  updateStats();
+  document.getElementById('stats').style.display = 'grid';
+  document.getElementById('table-card').style.display = 'block';
+  renderTable();
+}
+
+// ─────────────────────────────────────────────
+//  Stats
+// ─────────────────────────────────────────────
+function updateStats() {
+  const merged = allPRs.filter(p => getStatus(p) === 'merged').length;
+  const open   = allPRs.filter(p => getStatus(p) === 'open').length;
+  const closed = allPRs.filter(p => getStatus(p) === 'closed').length;
+  document.getElementById('s-total').textContent  = allPRs.length;
+  document.getElementById('s-merged').textContent = merged;
+  document.getElementById('s-open').textContent   = open;
+  document.getElementById('s-closed').textContent = closed;
+  document.getElementById('s-members').textContent = usernames.length;
+}
+
+// ─────────────────────────────────────────────
+//  Sort
+// ─────────────────────────────────────────────
+function sortBy(col) {
+  if (sortCol === col) sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+  else { sortCol = col; sortDir = 'desc'; }
+  // Update header classes
+  ['user','title','repo','status','created','merged'].forEach(c => {
+    const th = document.getElementById('th-' + c);
+    if (!th) return;
+    th.classList.remove('sort-asc', 'sort-desc');
+    if (c === sortCol) th.classList.add(sortDir === 'asc' ? 'sort-asc' : 'sort-desc');
+    const icon = th.querySelector('.sort-icon');
+    if (icon) icon.textContent = (c === sortCol) ? (sortDir === 'asc' ? '↑' : '↓') : '⇅';
+  });
+  renderTable();
+}
+
+// ─────────────────────────────────────────────
+//  Table render
+// ─────────────────────────────────────────────
+function renderTable() {
+  const search    = (document.getElementById('search-box').value || '').toLowerCase();
+  const statusFilter = document.getElementById('filter-status').value;
+
+  let rows = allPRs.filter(pr => {
+    const status = getStatus(pr);
+    const repo   = getRepo(pr).toLowerCase();
+    const title  = (pr.title || '').toLowerCase();
+    const user   = (pr._user || (pr.user && pr.user.login) || '').toLowerCase();
+
+    if (statusFilter !== 'all' && status !== statusFilter) return false;
+    if (search && !title.includes(search) && !repo.includes(search) && !user.includes(search)) return false;
+    return true;
+  });
+
+  // Sort
+  rows.sort((a, b) => {
+    let av, bv;
+    if (sortCol === 'user')    { av = (a._user || ''); bv = (b._user || ''); }
+    if (sortCol === 'title')   { av = a.title || ''; bv = b.title || ''; }
+    if (sortCol === 'repo')    { av = getRepo(a); bv = getRepo(b); }
+    if (sortCol === 'status')  { av = getStatus(a); bv = getStatus(b); }
+    if (sortCol === 'created') { av = a.created_at || ''; bv = b.created_at || ''; }
+    if (sortCol === 'merged')  {
+      av = (a.pull_request && a.pull_request.merged_at) || '';
+      bv = (b.pull_request && b.pull_request.merged_at) || '';
+    }
+    if (av < bv) return sortDir === 'asc' ? -1 : 1;
+    if (av > bv) return sortDir === 'asc' ? 1 : -1;
+    return 0;
+  });
+
+  document.getElementById('result-count').textContent =
+    `Showing ${rows.length} of ${allPRs.length} PRs`;
+
+  const tbody = document.getElementById('pr-tbody');
+  const empty = document.getElementById('empty-table');
+
+  if (!rows.length) {
+    tbody.innerHTML = '';
+    empty.style.display = 'block';
+    return;
+  }
+  empty.style.display = 'none';
+
+  tbody.innerHTML = rows.map(pr => {
+    const status  = getStatus(pr);
+    const repo    = getRepo(pr);
+    const user    = pr._user || (pr.user && pr.user.login) || '?';
+    const avatar  = pr.user && pr.user.avatar_url
+      ? `<img src="${pr.user.avatar_url}" class="avatar" loading="lazy" />`
+      : '';
+    const badgeClass = `badge-${status}`;
+    const mergedAt  = (pr.pull_request && pr.pull_request.merged_at)
+      ? fmtDate(pr.pull_request.merged_at) : '—';
+    const prNum = pr.number || '';
+
+    return `
+      <tr>
+        <td>${avatar}<strong>${user}</strong></td>
+        <td class="pr-title">
+          <a href="${pr.html_url}" target="_blank" title="${pr.title}">#${prNum} ${pr.title}</a>
+        </td>
+        <td><span class="repo-chip">${repo}</span></td>
+        <td><span class="badge ${badgeClass}">${status}</span></td>
+        <td>${fmtDate(pr.created_at)}</td>
+        <td>${mergedAt}</td>
+      </tr>`;
+  }).join('');
+}
+
+// ─────────────────────────────────────────────
+//  Export CSV
+// ─────────────────────────────────────────────
+function exportCSV() {
+  if (!allPRs.length) { setAlert('No data to export. Fetch PRs first.', 'error'); return; }
+  const headers = ['User','PR Number','Title','Repository','Status','URL','Created','Merged'];
+  const rows = allPRs.map(pr => [
+    pr._user || (pr.user && pr.user.login) || '',
+    pr.number || '',
+    `"${(pr.title || '').replace(/"/g,'""')}"`,
+    getRepo(pr),
+    getStatus(pr),
+    pr.html_url || '',
+    pr.created_at || '',
+    (pr.pull_request && pr.pull_request.merged_at) || ''
+  ]);
+  const csv = [headers, ...rows].map(r => r.join(',')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a'); a.href = url;
+  a.download = `apache-prs-${new Date().toISOString().slice(0,10)}.csv`;
+  a.click(); URL.revokeObjectURL(url);
+}
+
+// ─────────────────────────────────────────────
+//  Clear
+// ─────────────────────────────────────────────
+function clearAll() {
+  usernames = []; renderTags();
+  allPRs = [];
+  document.getElementById('stats').style.display = 'none';
+  document.getElementById('table-card').style.display = 'none';
+  document.getElementById('alerts').innerHTML = '';
+  document.getElementById('rate-info').textContent = '';
+  document.getElementById('gh-token').value = '';
+  document.getElementById('date-from').value = '';
+  document.getElementById('date-to').value   = '';
+  document.getElementById('filter-status').value = 'all';
+  document.getElementById('filter-repo').value   = '';
+  document.getElementById('search-box').value    = '';
+}
+
+// Set default date range: last 6 months
+(function() {
+  const now  = new Date();
+  const past = new Date(); past.setMonth(past.getMonth() - 6);
+  document.getElementById('date-to').value   = now.toISOString().slice(0,10);
+  document.getElementById('date-from').value = past.toISOString().slice(0,10);
+})();
+
+// Initialize sort header
+sortBy('created');
+</script>
+</body>
+</html>
